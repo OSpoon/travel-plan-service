@@ -141,14 +141,14 @@ wheels = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
+version = "8.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/0f/62ca20172d4f87d93cf89665fbaedcd560ac48b465bd1d92bfc7ea6b0a41/click-8.2.0.tar.gz", hash = "sha256:f5452aeddd9988eefa20f90f05ab66f17fce1ee2a36907fd30b05bbb5953814d", size = 235857 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2", size = 98188 },
+    { url = "https://files.pythonhosted.org/packages/a2/58/1f37bf81e3c689cc74ffa42102fa8915b59085f54a6e4a80bc6265c0f6bf/click-8.2.0-py3-none-any.whl", hash = "sha256:6b303f0b2aa85f1cb4e5303078fadcbcd4e476f114fab9b5007005711839325c", size = 102156 },
 ]
 
 [[package]]
@@ -512,7 +512,7 @@ wheels = [
 
 [[package]]
 name = "mcp-use"
-version = "1.2.8"
+version = "1.2.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -525,9 +525,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/2b/69b1fde6157e448942a8cd5b1eb2bc07729fc7508dff28b3e3350a590f1e/mcp_use-1.2.8.tar.gz", hash = "sha256:d0683d355dca85da2fe0d9d6477aa3d57128ec7459825b2f2905426223dd75e9", size = 4662364 }
+sdist = { url = "https://files.pythonhosted.org/packages/96/a4/6f0c5ac946e5e7062d70cb70a4b93bfcab3347460efb1daba8c925b730bd/mcp_use-1.2.9.tar.gz", hash = "sha256:20adc068c6924cbb27a2d53aef403713b9416f735b9542b2e92773aa6695b4f4", size = 4664260 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c5/14/8dacfa13a33d5d7dcf1928dfba8c3f940d238f73c23ae9a0c8a2481b5c83/mcp_use-1.2.8-py3-none-any.whl", hash = "sha256:8a0761b296fb57cbffe412952cab61b9833e6226bdb920b37383b9edfe26c9f3", size = 50241 },
+    { url = "https://files.pythonhosted.org/packages/23/58/dd3c442d8cfe756a5da0e6783fa13c43c1705a0626b492d8857c833da268/mcp_use-1.2.9-py3-none-any.whl", hash = "sha256:1cb571407312a3afaf257eba458f597f082ec668848308dc05cf51bf1a592433", size = 51497 },
 ]
 
 [[package]]
@@ -964,7 +964,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "langchain-openai", specifier = ">=0.3.16" },
-    { name = "mcp-use", specifier = ">=1.2.8" },
+    { name = "mcp-use", specifier = ">=1.2.9" },
     { name = "pydantic", specifier = ">=2.6.3" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "uvicorn", specifier = ">=0.27.1" },

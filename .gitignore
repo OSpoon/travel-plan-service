@@ -13,3 +13,16 @@ wheels/
 .env.*
 *.env
 *.env.*
+
+# Node.js
+node_modules/
+# Yarn
+yarn-error.log
+# npm
+npm-debug.log
+# pnpm
+pnpm-debug.log
+# Vite
+.vite/
+# SvelteKit
+.svelte-kit/

@@ -4,35 +4,7 @@ from mcp_use import MCPAgent, MCPClient
 
 
 class TravelPlanAgent:
-    def __init__(self):
-        AMAP_KEY = os.getenv("AMAP_KEY", "")
-        self.client = MCPClient.from_dict(
-            {
-                "mcpServers": {
-                    "amap-amap-sse": {"url": f"https://mcp.amap.com/sse?key={AMAP_KEY}"}
-                }
-            }
-        )
-
-    async def execute(
-        self,
-        query: str,
-        model: str,
-        base_url: str,
-        api_key: str,
-    ):
-        llm = ChatOpenAI(
-            model=model,
-            base_url=base_url,
-            api_key=api_key,
-        )
-
-        agent = MCPAgent(
-            llm=llm,
-            client=self.client,
-            max_steps=30,
-            verbose=True,
-            system_prompt="""# Role: 专业旅行规划顾问
+    system_prompt = """# Role: 专业旅行规划顾问
 
 ## Profile
 - language: 中文
@@ -119,8 +91,127 @@ class TravelPlanAgent:
    - 使用 --- 作为分隔线
 
 ## Initialization
-作为专业旅行规划顾问，我将基于您的初始信息，运用专业知识和丰富经验，直接为您输出一份完整、可行、个性化的旅行方案。所有输出内容将严格遵循上述Markdown格式规范，确保信息层次分明、结构清晰。无需额外的交互确认。
-""",
+作为专业旅行规划顾问，我将基于您的初始信息，运用专业知识和丰富经验，直接为您输出一份完整、可行、个性化的旅行方案。所有输出内容将严格遵循上述Markdown格式规范，确保信息层次分明、结构清晰。
+"""
+
+    def __init__(self):
+        AMAP_KEY = os.getenv("AMAP_KEY", "")
+        self.client = MCPClient.from_dict(
+            {
+                "mcpServers": {
+                    "amap-amap-sse": {"url": f"https://mcp.amap.com/sse?key={AMAP_KEY}"}
+                }
+            }
+        )
+
+    async def run(
+        self,
+        query: str,
+        model: str,
+        base_url: str,
+        api_key: str,
+    ):
+        llm = ChatOpenAI(
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+        )
+
+        agent = MCPAgent(
+            llm=llm,
+            client=self.client,
+            max_steps=30,
+            system_prompt=self.system_prompt,
         )
 
         return await agent.run(query)
+
+    async def astream(
+        self,
+        query: str,
+        model: str,
+        base_url: str,
+        api_key: str,
+    ):
+        """流式处理旅行规划请求
+
+        Args:
+            query (str): 用户查询
+            model (str): 语言模型名称
+            base_url (str): 模型API基础URL
+            api_key (str): API密钥
+
+        Yields:
+            str: 流式生成的内容文本
+        """
+        llm = ChatOpenAI(
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+        )
+
+        agent = MCPAgent(
+            llm=llm,
+            client=self.client,
+            max_steps=30,
+            verbose=True,
+            system_prompt=self.system_prompt,
+        )
+
+        async for chunk in agent.astream(query):
+            try:
+                # LangChain AIMessage 处理
+                if hasattr(chunk, "content") and chunk.content is not None:
+                    yield chunk.content
+                    continue
+
+                # LangChain AddableDict 处理
+                if hasattr(chunk, "get") and callable(chunk.get):
+                    # 检查是否包含AIMessage类型消息
+                    if chunk.get("messages"):
+                        messages = chunk.get("messages")
+                        if messages and hasattr(messages[0], "content"):
+                            yield messages[0].content
+                            continue
+                        elif (
+                            messages
+                            and isinstance(messages[0], dict)
+                            and "content" in messages[0]
+                        ):
+                            yield messages[0]["content"]
+                            continue
+
+                    # 检查是否直接包含content
+                    if chunk.get("content"):
+                        yield chunk.get("content")
+                        continue
+
+                    # 检查是否包含最终输出
+                    if chunk.get("output"):
+                        if isinstance(chunk.get("output"), str):
+                            yield chunk.get("output")
+                            continue
+                        elif hasattr(chunk.get("output"), "content"):
+                            yield chunk.get("output").content
+                            continue
+
+                    # 检查是否包含steps与actions
+                    if chunk.get("steps"):
+                        for step in chunk.get("steps"):
+                            if step.get("action") and step.get("action").get("log"):
+                                action_log = step.get("action").get("log")
+                                if (
+                                    isinstance(action_log, list)
+                                    and action_log
+                                    and hasattr(action_log[0], "content")
+                                ):
+                                    yield action_log[0].content
+                                    break
+
+                # 如果上面的方法都不行，尝试将对象转换为字符串
+                if hasattr(chunk, "__str__"):
+                    yield str(chunk)
+
+            except Exception as e:
+                print(f"处理LangChain响应时出错: {e}")
+                continue  # 跳过错误的数据块，继续处理

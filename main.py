@@ -1,45 +1,61 @@
-import uvicorn
 import os
+import json
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional
 from agent import TravelPlanAgent
+from sse_starlette.sse import EventSourceResponse
 
 load_dotenv()
 
-app = FastAPI(
-    title="Travel Plan Service", description="旅行规划服务API", version="0.1.0"
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-
-class TravelPlanRequest(BaseModel):
-    query: str
-    model: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
+travel_agent = TravelPlanAgent()
 
 
-class TravelPlanResponse(BaseModel):
-    plan: str
+@app.post("/travel-plan/stream")
+async def travel_plan_stream(request: Request):
+    # 从请求体获取query
+    data = await request.json()
+    query = data.get("query", "")
 
-
-@app.post("/travel-plan", response_model=TravelPlanResponse)
-async def create_travel_plan(request: TravelPlanRequest):
-    try:
-        agent = TravelPlanAgent()
-        result = await agent.execute(
-            query=request.query,
-            model=request.model or os.getenv("LLM_MODEL", ""),
-            base_url=request.base_url or os.getenv("LLM_BASE_URL", ""),
-            api_key=request.api_key or os.getenv("LLM_API_KEY", ""),
+    if not query.strip():
+        return Response(
+            content=json.dumps({"error": "查询参数不能为空"}),
+            media_type="application/json",
         )
-        return TravelPlanResponse(plan=result)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+    async def event_generator():
+        try:
+            async for content in travel_agent.astream(
+                query=query,
+                model=os.getenv("LLM_MODEL", ""),
+                base_url=os.getenv("LLM_BASE_URL", ""),
+                api_key=os.getenv("LLM_API_KEY", ""),
+            ):
+                # 返回SSE格式的消息
+                yield {
+                    "event": "message",
+                    "data": content,
+                }
+
+            # 发送完成事件
+            yield {"event": "complete"}
+        except Exception as e:
+            print(f"Stream error: {e}")
+            yield {"event": "error", "data": str(e)}
+
+    return EventSourceResponse(event_generator())
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

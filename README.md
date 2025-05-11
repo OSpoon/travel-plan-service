@@ -10,6 +10,108 @@
 - RESTful API：提供简单易用的HTTP接口
 - 灵活配置：支持自定义语言模型参数
 - 环境变量支持：通过.env文件安全管理配置
+- 流式输出：支持实时流式返回AI生成内容
+
+## 数据格式说明
+
+### 消息格式
+
+服务端返回的每条消息都是JSON格式，包含以下字段：
+
+```json
+{
+  "type": "AIMessage | FunctionMessage",  // 消息类型
+  "content": "消息内容",                 // Markdown格式的文本内容
+  "name": "工具名称",                    // 仅在FunctionMessage类型时存在
+  "tool_calls": [                        // 工具调用信息（可选）
+    {
+      "name": "工具名称",
+      "arguments": "工具参数"
+    }
+  ]
+}
+```
+
+### 消息类型说明
+
+1. AIMessage
+   - 表示AI助手的回复消息
+   - content字段包含Markdown格式的文本
+   - 可能包含tool_calls字段，表示需要调用的工具
+
+2. FunctionMessage
+   - 表示工具调用的结果
+   - name字段指示工具名称
+   - content字段包含工具返回的结果
+
+### 前端渲染建议
+
+1. 内容渲染
+   - 使用Markdown渲染库处理content字段
+   - 支持标题、列表、表格等Markdown语法
+   - 保留原始格式和换行
+
+2. 工具调用处理
+   - 解析tool_calls数组中的工具调用信息
+   - 针对特定工具（如地图导航）提供可视化展示
+   - 支持异步加载工具调用结果
+
+3. 流式更新
+   - 实现打字机效果的渲染
+   - 支持内容块的动态追加
+   - 处理不同类型消息的平滑过渡
+
+### 示例代码
+
+```javascript
+// 前端流式处理示例
+const processStream = async (response) => {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  
+  while (true) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, {stream: true});
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+    
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = JSON.parse(line.slice(6));
+        if (data.content) {
+          // 渲染Markdown内容
+          renderMarkdown(data.content);
+        }
+        if (data.additional_kwargs?.tool_calls) {
+          // 处理工具调用
+          handleToolCalls(data.additional_kwargs.tool_calls);
+        }
+      }
+    }
+  }
+};
+
+// Markdown渲染函数
+const renderMarkdown = (content) => {
+  const html = marked(content); // 使用marked等Markdown库
+  appendToOutput(html);
+};
+
+// 工具调用处理函数
+const handleToolCalls = (toolCalls) => {
+  toolCalls.forEach(call => {
+    switch(call.function.name) {
+      case 'maps_direction_driving':
+        renderMap(JSON.parse(call.function.arguments));
+        break;
+      // 处理其他工具调用
+    }
+  });
+};
+```
 
 ## 技术栈
 
@@ -89,6 +191,37 @@ print(response.json())
 {
     "plan": "string"               // 生成的旅行计划
 }
+```
+
+### POST /travel-plan/stream
+
+创建旅行计划（流式输出）
+
+**请求体：**
+
+与 `/travel-plan` 接口相同
+
+**响应：**
+
+返回 Server-Sent Events (SSE) 流，每个事件包含生成的旅行计划的部分内容。
+
+**使用示例：**
+
+```python
+import requests
+
+def stream_response(url, data):
+    with requests.post(url, json=data, stream=True) as response:
+        for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+            if chunk:
+                print(chunk, end="", flush=True)
+
+url = "http://localhost:8000/travel-plan/stream"
+data = {
+    "query": "帮我规划一个为期3天的北京旅行计划"
+}
+
+stream_response(url, data)
 ```
 
 ## 开发说明
