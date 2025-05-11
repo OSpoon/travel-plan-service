@@ -1,242 +1,222 @@
 # Travel Plan Service 旅行规划服务
 
-## 项目简介
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-这是一个基于AI的旅行规划服务，能够根据用户的具体需求，自动生成个性化的旅行攻略。该服务使用FastAPI构建RESTful API，集成了先进的语言模型来提供智能化的旅行规划建议。
+## 目录
 
-## 功能特点
+- 项目概述
+- 主要功能
+- 快速开始
+- API 文档
+- 前端集成
+- 开发指南
+- 常见问题
 
-- 智能旅行规划：根据用户输入自动生成定制化旅行方案
-- RESTful API：提供简单易用的HTTP接口
-- 灵活配置：支持自定义语言模型参数
-- 环境变量支持：通过.env文件安全管理配置
-- 流式输出：支持实时流式返回AI生成内容
+## 项目概述
 
-## 数据格式说明
+Travel Plan Service 是一个基于 AI 的智能旅行规划服务，可以根据用户需求自动生成个性化旅行攻略。系统利用先进的语言模型，结合地图服务和旅游数据，提供全面且实用的旅行建议。
 
-### 消息格式
+**核心亮点**：
+- 🤖 智能规划：基于大型语言模型的个性化旅行方案
+- 🔄 实时响应：支持流式输出，提供即时反馈
+- 🔌 易于集成：RESTful API 设计，支持各类前端应用
+- 🗺️ 地图集成：内置地图服务支持，提供导航建议
 
-服务端返回的每条消息都是JSON格式，包含以下字段：
+## 主要功能
 
-```json
-{
-  "type": "AIMessage | FunctionMessage",  // 消息类型
-  "content": "消息内容",                 // Markdown格式的文本内容
-  "name": "工具名称",                    // 仅在FunctionMessage类型时存在
-  "tool_calls": [                        // 工具调用信息（可选）
-    {
-      "name": "工具名称",
-      "arguments": "工具参数"
-    }
-  ]
-}
-```
+- **个性化旅行规划**：生成包含景点、餐饮、交通、住宿的完整方案
+- **行程优化**：根据距离、开放时间、游览时长自动优化路线
+- **预算估算**：提供各项费用的参考价格，帮助控制旅行成本
+- **流式响应**：支持打字机式实时内容展示，提升用户体验
+- **灵活配置**：通过环境变量轻松调整模型参数和 API 设置
 
-### 消息类型说明
+## 快速开始
 
-1. AIMessage
-   - 表示AI助手的回复消息
-   - content字段包含Markdown格式的文本
-   - 可能包含tool_calls字段，表示需要调用的工具
+### 安装
 
-2. FunctionMessage
-   - 表示工具调用的结果
-   - name字段指示工具名称
-   - content字段包含工具返回的结果
-
-### 前端渲染建议
-
-1. 内容渲染
-   - 使用Markdown渲染库处理content字段
-   - 支持标题、列表、表格等Markdown语法
-   - 保留原始格式和换行
-
-2. 工具调用处理
-   - 解析tool_calls数组中的工具调用信息
-   - 针对特定工具（如地图导航）提供可视化展示
-   - 支持异步加载工具调用结果
-
-3. 流式更新
-   - 实现打字机效果的渲染
-   - 支持内容块的动态追加
-   - 处理不同类型消息的平滑过渡
-
-### 示例代码
-
-```javascript
-// 前端流式处理示例
-const processStream = async (response) => {
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  
-  while (true) {
-    const {value, done} = await reader.read();
-    if (done) break;
-    
-    buffer += decoder.decode(value, {stream: true});
-    const lines = buffer.split("\n");
-    buffer = lines.pop();
-    
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = JSON.parse(line.slice(6));
-        if (data.content) {
-          // 渲染Markdown内容
-          renderMarkdown(data.content);
-        }
-        if (data.additional_kwargs?.tool_calls) {
-          // 处理工具调用
-          handleToolCalls(data.additional_kwargs.tool_calls);
-        }
-      }
-    }
-  }
-};
-
-// Markdown渲染函数
-const renderMarkdown = (content) => {
-  const html = marked(content); // 使用marked等Markdown库
-  appendToOutput(html);
-};
-
-// 工具调用处理函数
-const handleToolCalls = (toolCalls) => {
-  toolCalls.forEach(call => {
-    switch(call.function.name) {
-      case 'maps_direction_driving':
-        renderMap(JSON.parse(call.function.arguments));
-        break;
-      // 处理其他工具调用
-    }
-  });
-};
-```
-
-## 技术栈
-
-- Python >= 3.13
-- FastAPI
-- Langchain
-- Uvicorn
-- Python-dotenv
-- Pydantic
-
-## 安装说明
-
-1. 克隆项目到本地：
 ```bash
-git clone [repository-url]
+# 克隆仓库
+git clone https://github.com/yourusername/travel-plan-service.git
 cd travel-plan-service
-```
 
-2. 安装依赖：
-```bash
+# 安装依赖
 pip install -e .
+
+# 配置环境
+cp .env.example .env
+# 编辑 .env 文件填入必要配置
 ```
 
-3. 配置环境变量：
-   - 复制`.env.example`文件并重命名为`.env`
-   - 在`.env`文件中填入必要的配置信息：
-```env
+### 配置
+
+在 .env 文件中设置以下参数：
+
+```
 LLM_MODEL=your_model_name
 LLM_BASE_URL=your_base_url
 LLM_API_KEY=your_api_key
 
-AMAP_KEY=your_amap_key
+AMAP_KEY=your_amap_key  # 高德地图API密钥(可选)
 ```
 
-## 使用方法
+### 启动服务
 
-1. 启动服务：
 ```bash
 python main.py
 ```
-服务将在 http://localhost:8000 启动
 
-2. API调用示例：
+服务默认在 `http://localhost:8000` 启动
 
-```python
-import requests
+### 示例请求
 
-url = "http://localhost:8000/travel-plan"
-data = {
-    "query": "帮我规划一个为期3天的北京旅行计划"
-}
-
-response = requests.post(url, json=data)
-print(response.json())
+```bash
+curl -X POST "http://localhost:8000/travel-plan" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "帮我规划一个为期3天的北京旅行计划"}'
 ```
 
-## API文档
+## API 文档
 
-### POST /travel-plan
+### 旅行规划接口
 
-创建旅行计划
+**POST /travel-plan/stream**
 
-**请求体：**
+创建旅行计划并以流式方式返回内容，适合实现打字机效果。
 
-```json
-{
-    "query": "string",              // 必填，旅行需求描述
-    "model": "string",             // 可选，语言模型名称
-    "base_url": "string",          // 可选，模型API基础URL
-    "api_key": "string"           // 可选，API密钥
+- 使用 Server-Sent Events (SSE) 格式
+- 每个事件包含生成的部分内容
+- 当生成完成时发送 `event: complete` 事件
+
+```javascript
+// 前端请求示例
+const response = await fetch('/travel-plan/stream', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    query: "帮我规划一个为期3天的北京旅行计划"
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const {done, value} = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  // 处理接收到的数据块...
 }
 ```
 
-**响应：**
+## 前端集成
 
-```json
-{
-    "plan": "string"               // 生成的旅行计划
-}
+### 数据格式
+
+服务返回标准的 Markdown 格式文本，包含以下内容：
+
+- 标题与分节标记
+- 行程详情与时间安排
+- 景点列表与描述
+- 交通与住宿建议
+- 费用估算表格
+- 注意事项与提示
+
+### 渲染建议
+
+1. **使用 Markdown 渲染库**：如 `marked` (JS), `markdown-it` 等
+2. **实现打字机效果**：通过流式响应逐步展示内容
+3. **响应式布局**：确保在移动设备上有良好体验
+4. **提供复制与导出功能**：支持一键保存旅行计划
+
+### 示例前端实现
+
+```vue
+<script setup>
+import { ref } from 'vue';
+import { marked } from 'marked';
+
+const query = ref('');
+const travelContent = ref('');
+const loading = ref(false);
+
+const submitQuery = async () => {
+  loading.value = true;
+  travelContent.value = '';
+
+  const response = await fetch('/travel-plan/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: query.value })
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value, { stream: true });
+    const lines = chunk.split('\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        travelContent.value += line.substring(6) + '\n';
+      }
+    }
+  }
+  
+  loading.value = false;
+};
+</script>
 ```
 
-### POST /travel-plan/stream
+## 开发指南
 
-创建旅行计划（流式输出）
+### 项目结构
 
-**请求体：**
-
-与 `/travel-plan` 接口相同
-
-**响应：**
-
-返回 Server-Sent Events (SSE) 流，每个事件包含生成的旅行计划的部分内容。
-
-**使用示例：**
-
-```python
-import requests
-
-def stream_response(url, data):
-    with requests.post(url, json=data, stream=True) as response:
-        for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
-            if chunk:
-                print(chunk, end="", flush=True)
-
-url = "http://localhost:8000/travel-plan/stream"
-data = {
-    "query": "帮我规划一个为期3天的北京旅行计划"
-}
-
-stream_response(url, data)
+```
+travel-plan-service/
+├── main.py           # FastAPI 应用入口
+├── agent.py          # 旅行规划代理实现
+├── mcps.json         # MCP 配置文件
+├── requirements.txt  # 项目依赖
+└── .env              # 环境变量配置(需创建)
 ```
 
-## 开发说明
+### 技术栈
 
-- `main.py`: FastAPI应用程序入口
-- `agent.py`: 旅行规划代理实现
-- `mcps.json`: MCP配置文件
-- `.env`: 环境变量配置
+- **Python >= 3.13**
+- **FastAPI**: Web框架
+- **Langchain**: LLM应用开发框架
+- **Uvicorn**: ASGI服务器
+- **Python-dotenv**: 环境变量管理
+- **Pydantic**: 数据验证
 
-## 注意事项
+### 扩展与自定义
 
-- 确保已正确配置所有必要的环境变量
-- API密钥等敏感信息请妥善保管，不要提交到版本控制系统
-- 建议在生产环境中使用适当的安全措施保护API端点
+- **添加新工具**：在 agent.py 中实现新的工具函数
+- **调整系统提示**：修改 `mcps.json` 中的系统提示模板
+- **自定义响应格式**：在 main.py 中修改响应处理逻辑
+
+## 常见问题
+
+### 处理超时错误
+
+如果遇到请求超时问题，可尝试:
+1. 增加 timeout 设置
+2. 使用流式 API (`/travel-plan/stream`)
+3. 优化提示词，使其更简洁
+
+### 调整生成质量
+
+- 可通过环境变量 `LLM_MODEL` 更换不同模型
+- 调整 `mcps.json` 中的系统提示以引导输出格式
+- 添加具体的需求和偏好到用户查询中
+
+---
 
 ## 许可证
 
-MIT License
+本项目采用 MIT 许可证 进行许可。
