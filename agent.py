@@ -1,5 +1,6 @@
 import os
 from langchain_openai import ChatOpenAI
+from langchain_core.messages.ai import AIMessageChunk
 from mcp_use import MCPAgent, MCPClient
 
 
@@ -104,28 +105,6 @@ class TravelPlanAgent:
             }
         )
 
-    async def run(
-        self,
-        query: str,
-        model: str,
-        base_url: str,
-        api_key: str,
-    ):
-        llm = ChatOpenAI(
-            model=model,
-            base_url=base_url,
-            api_key=api_key,
-        )
-
-        agent = MCPAgent(
-            llm=llm,
-            client=self.client,
-            max_steps=30,
-            system_prompt=self.system_prompt,
-        )
-
-        return await agent.run(query)
-
     async def astream(
         self,
         query: str,
@@ -158,60 +137,13 @@ class TravelPlanAgent:
             system_prompt=self.system_prompt,
         )
 
-        async for chunk in agent.astream(query):
+        async for event in agent.astream(query):
             try:
-                # LangChain AIMessage 处理
-                if hasattr(chunk, "content") and chunk.content is not None:
-                    yield chunk.content
-                    continue
-
-                # LangChain AddableDict 处理
-                if hasattr(chunk, "get") and callable(chunk.get):
-                    # 检查是否包含AIMessage类型消息
-                    if chunk.get("messages"):
-                        messages = chunk.get("messages")
-                        if messages and hasattr(messages[0], "content"):
-                            yield messages[0].content
-                            continue
-                        elif (
-                            messages
-                            and isinstance(messages[0], dict)
-                            and "content" in messages[0]
-                        ):
-                            yield messages[0]["content"]
-                            continue
-
-                    # 检查是否直接包含content
-                    if chunk.get("content"):
-                        yield chunk.get("content")
-                        continue
-
-                    # 检查是否包含最终输出
-                    if chunk.get("output"):
-                        if isinstance(chunk.get("output"), str):
-                            yield chunk.get("output")
-                            continue
-                        elif hasattr(chunk.get("output"), "content"):
-                            yield chunk.get("output").content
-                            continue
-
-                    # 检查是否包含steps与actions
-                    if chunk.get("steps"):
-                        for step in chunk.get("steps"):
-                            if step.get("action") and step.get("action").get("log"):
-                                action_log = step.get("action").get("log")
-                                if (
-                                    isinstance(action_log, list)
-                                    and action_log
-                                    and hasattr(action_log[0], "content")
-                                ):
-                                    yield action_log[0].content
-                                    break
-
-                # 如果上面的方法都不行，尝试将对象转换为字符串
-                if hasattr(chunk, "__str__"):
-                    yield str(chunk)
+                event_type = event.get("event", "")
+                if event_type == "on_chat_model_stream":
+                    chunk: AIMessageChunk = event.get("data", {}).get("chunk")
+                    if chunk.content:
+                        yield chunk.content
 
             except Exception as e:
                 print(f"处理LangChain响应时出错: {e}")
-                continue  # 跳过错误的数据块，继续处理

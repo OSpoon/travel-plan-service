@@ -33,13 +33,19 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { marked } from 'marked'
 import { ElMessage } from 'element-plus'
 
 const query = ref('')
 const travelContent = ref('')
 const loading = ref(false)
+let eventSource = null
+
+// 组件卸载时清理
+onUnmounted(() => {
+  closeSSEConnection()
+})
 
 // 使用计算属性渲染Markdown
 const renderedContent = computed(() => {
@@ -59,6 +65,57 @@ const renderMarkdown = (content) => {
   return marked(content);
 }
 
+// 初始化SSE连接
+const initSSE = () => {
+  const url = `/travel-plan/stream?query=${encodeURIComponent(query.value)}`
+  eventSource = new EventSource(url)
+
+  // 处理开始事件
+  eventSource.addEventListener('start', () => {
+    loading.value = true
+    travelContent.value = ''
+  })
+
+  // 处理消息事件
+  eventSource.addEventListener('message', (event) => {
+    try {
+      const { content } = JSON.parse(event.data)
+      if (content) {
+        loading.value = false
+        travelContent.value += content
+      }
+    } catch (error) {
+      console.error('解析消息失败:', error)
+    }
+  })
+
+  // 处理完成事件  
+  eventSource.addEventListener('complete', () => {
+    loading.value = false
+    closeSSEConnection()
+  })
+
+  // 处理错误事件
+  eventSource.addEventListener('error', () => {
+    if (eventSource?.readyState === EventSource.CLOSED) {
+      loading.value = false
+      closeSSEConnection()
+
+      // 只在没有内容时显示错误
+      if (!travelContent.value) {
+        ElMessage.error('连接中断，请重试')
+      }
+    }
+  })
+}
+
+const closeSSEConnection = () => {
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
 // 提交查询
 const submitQuery = async () => {
   if (!query.value.trim()) {
@@ -66,48 +123,16 @@ const submitQuery = async () => {
     return
   }
 
-  loading.value = true
-  travelContent.value = ''
+  // 关闭已有连接
+  closeSSEConnection()
 
   try {
-    const response = await fetch('/travel-plan/stream', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: query.value
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    // 使用标准的ReadableStream API处理流数据
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      const chunk = decoder.decode(value, { stream: true })
-
-      const lines = chunk.split('\n')
-
-      // 逐行处理
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          travelContent.value += line.substring(6) + '\n'
-        }
-      }
-    }
+    // 初始化新的SSE连接
+    initSSE()
   } catch (error) {
+    loading.value = false
     console.error('请求出错:', error)
     ElMessage.error(`请求出错: ${error.message}`)
-  } finally {
-    loading.value = false
   }
 }
 </script>
