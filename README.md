@@ -4,17 +4,17 @@
 
 ## 项目概述
 
-Travel Plan Service 是一个基于 AI 的智能旅行规划服务，使用 SSE (Server-Sent Events) 实现实时流式响应，提供个性化旅行攻略生成服务。
+Travel Plan Service 是一个基于 AI 的智能旅行规划服务，使用 FastAPI StreamingResponse 实现实时流式响应，提供个性化旅行攻略生成服务。
 
 **核心特点**：
-- 🚀 流式响应：使用 SSE 技术实现打字机效果
+- 🚀 流式响应：使用 StreamingResponse 技术实现打字机效果
 - 📝 Markdown 渲染：支持富文本格式的旅行计划展示
 
 ## 技术栈
 
 - 前端：Vue 3
 - 后端：FastAPI
-- 通信：Server-Sent Events (SSE)
+- 通信：StreamingResponse
 - 文档渲染：Marked.js
 
 ## 快速开始
