@@ -51,77 +51,95 @@ npm run dev
 
 ## API 文档
 
-### 旅行规划 SSE 接口
+### 旅行规划流式接口
 
-**GET /travel-plan/stream**
+**POST /travel-plan/stream**
 
-支持流式响应的旅行规划生成接口。
+使用 StreamingResponse 实现的流式响应接口。
 
 请求参数：
+```json
+{
+  "query": "string"  // 旅行需求描述
+}
 ```
-query: string  // 旅行需求描述
-```
 
-SSE 事件类型：
-- `start`: 开始生成
-- `message`: 内容片段
-- `complete`: 生成完成
-- `error`: 发生错误
+响应格式：
+```json
+// 正常内容块
+{"content": "这是一段旅行计划内容..."}
 
-响应示例：
-```javascript
-// message 事件
-event: message
-data: 这是一段旅行计划内容...
+// 完成标记
+{"status": "complete"}
 
-// complete 事件
-event: complete
-data: 规划完成
-
-// error 事件
-event: error
-data: 错误信息
+// 错误信息
+{"error": "错误描述"}
 ```
 
 ## 前端集成
 
-### Vue 3 组件示例
+### Vue 3 示例
 
 ```vue
 <script setup>
-import { ref, onUnmounted } from 'vue'
-
 const query = ref('')
 const content = ref('')
 const loading = ref(false)
-let eventSource = null
+let abortController = null
 
-const initSSE = () => {
-  const url = `/travel-plan/stream?query=${encodeURIComponent(query.value)}`
-  eventSource = new EventSource(url)
+const submitQuery = async () => {
+  // 取消已有请求
+  if (abortController) {
+    abortController.abort()
+  }
 
-  eventSource.addEventListener('message', (event) => {
-    content.value += event.data
-  })
+  abortController = new AbortController()
+  loading.value = true
 
-  eventSource.addEventListener('complete', () => {
-    loading.value = false
-    closeConnection()
-  })
+  try {
+    const response = await fetch('/travel-plan/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query.value }),
+      signal: abortController.signal
+    })
 
-  eventSource.addEventListener('error', () => {
-    // 错误处理逻辑
-  })
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+
+    while (true) {
+      const { value, done } = await reader.read()
+      // 处理流式数据...
+    }
+  } catch (error) {
+    // 错误处理...
+  }
 }
 
-// 组件销毁时清理
 onUnmounted(() => {
-  if (eventSource) {
-    eventSource.close()
+  if (abortController) {
+    abortController.abort()
   }
 })
 </script>
 ```
+
+### 数据流处理
+
+1. 请求控制
+   - 使用 AbortController 管理请求生命周期
+   - 组件卸载时自动取消请求
+   - 新请求发起时取消旧请求
+
+2. 流式数据处理
+   - 使用 ReadableStream 接收数据流
+   - TextDecoder 解码二进制数据
+   - 按行解析 JSON 数据
+
+3. 错误处理
+   - 区分请求取消和其他错误
+   - 友好的错误提示
+   - 自动重置加载状态
 
 ## License
 

@@ -1,10 +1,10 @@
 import os
 import json
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from agent import TravelPlanAgent
-from sse_starlette.sse import EventSourceResponse
 
 load_dotenv()
 
@@ -19,16 +19,15 @@ app.add_middleware(
 
 travel_agent = TravelPlanAgent()
 
-
-@app.get("/travel-plan/stream")
-async def travel_plan_stream(query: str = Query(default="")):
+@app.post("/travel-plan/stream")
+async def travel_plan_stream(query: str = Body(..., embed=True)):
     if not query.strip():
         return Response(
             content=json.dumps({"error": "查询参数不能为空"}),
             media_type="application/json",
         )
 
-    async def event_generator():
+    async def content_generator():
         try:
             async for content in travel_agent.astream(
                 query=query,
@@ -37,17 +36,16 @@ async def travel_plan_stream(query: str = Query(default="")):
                 api_key=os.getenv("LLM_API_KEY", ""),
             ):
                 if content:
-                    yield {
-                        "event": "message",
-                        "data": json.dumps({"content": content}, ensure_ascii=False),
-                    }
-
-            # 发送完成事件
-            yield {"event": "complete", "data": "规划完成"}
+                    yield json.dumps({"content": content}, ensure_ascii=False) + "\n"
+            
+            # 发送完成标记
+            yield json.dumps({"status": "complete"}, ensure_ascii=False)
         except Exception as e:
-            yield {"event": "error", "data": str(e)}
+            yield json.dumps({"error": str(e)}, ensure_ascii=False)
 
-    return EventSourceResponse(event_generator())
+    return StreamingResponse(
+        content_generator(),
+    )
 
 
 if __name__ == "__main__":

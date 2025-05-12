@@ -40,11 +40,13 @@ import { ElMessage } from 'element-plus'
 const query = ref('')
 const travelContent = ref('')
 const loading = ref(false)
-let eventSource = null
+let abortController = null
 
 // 组件卸载时清理
 onUnmounted(() => {
-  closeSSEConnection()
+  if (abortController) {
+    abortController.abort()
+  }
 })
 
 // 使用计算属性渲染Markdown
@@ -65,57 +67,6 @@ const renderMarkdown = (content) => {
   return marked(content);
 }
 
-// 初始化SSE连接
-const initSSE = () => {
-  const url = `/travel-plan/stream?query=${encodeURIComponent(query.value)}`
-  eventSource = new EventSource(url)
-
-  // 处理开始事件
-  eventSource.addEventListener('start', () => {
-    loading.value = true
-    travelContent.value = ''
-  })
-
-  // 处理消息事件
-  eventSource.addEventListener('message', (event) => {
-    try {
-      const { content } = JSON.parse(event.data)
-      if (content) {
-        loading.value = false
-        travelContent.value += content
-      }
-    } catch (error) {
-      console.error('解析消息失败:', error)
-    }
-  })
-
-  // 处理完成事件  
-  eventSource.addEventListener('complete', () => {
-    loading.value = false
-    closeSSEConnection()
-  })
-
-  // 处理错误事件
-  eventSource.addEventListener('error', () => {
-    if (eventSource?.readyState === EventSource.CLOSED) {
-      loading.value = false
-      closeSSEConnection()
-
-      // 只在没有内容时显示错误
-      if (!travelContent.value) {
-        ElMessage.error('连接中断，请重试')
-      }
-    }
-  })
-}
-
-const closeSSEConnection = () => {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
-  }
-}
-
 // 提交查询
 const submitQuery = async () => {
   if (!query.value.trim()) {
@@ -123,16 +74,71 @@ const submitQuery = async () => {
     return
   }
 
-  // 关闭已有连接
-  closeSSEConnection()
+  // 取消之前的请求
+  if (abortController) {
+    abortController.abort()
+  }
+
+  // 创建新的 AbortController
+  abortController = new AbortController()
+  loading.value = true
+  travelContent.value = ''
 
   try {
-    // 初始化新的SSE连接
-    initSSE()
+    const response = await fetch('/travel-plan/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: query.value }),
+      signal: abortController.signal
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+
+    while (true) {
+      const { value, done } = await reader.read()
+      
+      if (done) {
+        loading.value = false
+        break
+      }
+
+      const chunk = decoder.decode(value)
+      const lines = chunk.split('\n').filter(line => line.trim())
+      
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line)
+          if (data.content) {
+            loading.value = false
+            travelContent.value += data.content
+          } else if (data.status === 'complete') {
+            loading.value = false
+            break
+          } else if (data.error) {
+            throw new Error(data.error)
+          }
+        } catch (e) {
+          console.error('解析数据失败:', e)
+        }
+      }
+    }
   } catch (error) {
     loading.value = false
-    console.error('请求出错:', error)
-    ElMessage.error(`请求出错: ${error.message}`)
+    if (error.name === 'AbortError') {
+      console.log('请求被取消')
+    } else {
+      console.error('请求出错:', error)
+      ElMessage.error(`请求出错: ${error.message}`)
+    }
+  } finally {
+    abortController = null
   }
 }
 </script>
